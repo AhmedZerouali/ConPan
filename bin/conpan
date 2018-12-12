@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2015-2018
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA.
+#
+# Authors:
+#     Ahmed Zerouali <mr.hmed@gmail.com>
+#     Valerio Cosentino <valcos@bitergia.com>
+#
+
+import argparse
+import logging
+import sys
+
+from conpan.conpan import ConPan
+
+
+def get_params_parser():
+    """Parse command line arguments
+
+    Valid arguments are:
+        -h, --help: summary about how to use the tool
+        -p, --packages: packages kind like "Debian" or "npm", etc
+        -d, --docker: specify the Docker image to analyze
+    """
+
+    parser = argparse.ArgumentParser(usage='',
+                                     description='',
+                                     epilog='',
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     add_help=False)
+
+    parser.add_argument('-h', '--help', action='help', help=argparse.SUPPRESS)
+    parser.add_argument('-p', '--packages', dest='packages', help="packages type, like 'Debian'")
+    parser.add_argument('-d', '--docker', dest='docker', help="a Docker image")
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+
+    return parser
+
+
+def get_params():
+
+    parser = get_params_parser()
+    args = parser.parse_args()
+
+    msg = "Please enter one of the following commands:\n" \
+          "(1) --packages <p> --docker <d>,\n" \
+          "(2) --help"
+
+    return args
+
+
+def main():
+    args = get_params()
+
+    try:
+        cp = ConPan(args.packages, args.docker)
+        # cp.analyze()
+        general_info, installed_packages, tracked_packages, vulnerabilities, bugs = cp.analyze()
+        print('\nResults: ')
+        print('General information about the Docker image: ', args.docker)
+        #for key in general_info:
+        #    print('-', str(key)+':', general_info[key])
+
+        print('\nResults about installed packages in: ', args.docker)
+        print('# installed packages:', len(installed_packages))
+        print('# tracked packages:', len(tracked_packages))
+        print('# vulnerabilities:', len(vulnerabilities))
+        print('# bugs:', len(bugs))
+
+    except Exception as e:
+        logging.error(e, exc_info=True)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        s = "\n\nReceived Ctrl-C or other break signal. Exiting.\n"
+        sys.stderr.write(s)
+        sys.exit(0)
