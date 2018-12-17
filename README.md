@@ -17,8 +17,10 @@ ConPan workflow is very simple:
 - docker-ce
 - pandas>=0.22.0
 - requests>=2.18.2
-- json
-- psycopg2==2.7.4
+- psycopg2-binary>=2.7.4
+- psycopg2>=2.7.4
+- apt_pkg
+
 
 ##  How to install/uninstall
 ConPan is developed and tested mainly on GNU/Linux platforms. Thus it is very likely it will work out of the box
@@ -46,7 +48,7 @@ You will need permission to use the Docker tool first.
 Launching ConPan from command line does not require much effort.
 
 ```
-$ conpan -p debian -d debian:buster-slim
+$ conpan -p debian -c debian:buster-slim -d Path-to/data
 ```
 
 ### From Python
@@ -57,7 +59,11 @@ ConPan can be embedded in your Python scripts. Again, the effort of using it is 
 from conpan.conpan import ConPan
 
 # With 2 parameters
-cp = ConPan(packages="debian", docker="debian:buster-slim")
+image_community = 'weboaks/chromium-xvfb-node'
+image_official = 'debian:buster-slim'
+dir_data = 'Path-to/data/'
+
+cp = ConPan(packages="debian", image=image_official, dir_data=dir_data)
 
 # extracting all information
 general_info, installed_packages, tracked_packages, vulnerabilities, bugs = cp.analyze()
