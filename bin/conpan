@@ -46,7 +46,8 @@ def get_params_parser():
 
     parser.add_argument('-h', '--help', action='help', help=argparse.SUPPRESS)
     parser.add_argument('-p', '--packages', dest='packages', help="packages type, like 'Debian'")
-    parser.add_argument('-d', '--docker', dest='docker', help="a Docker image")
+    parser.add_argument('-c', '--docker', dest='docker', help="a Docker image")
+    parser.add_argument('-d', '--dir', dest='dir', help="Data directory")
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -61,7 +62,7 @@ def get_params():
     args = parser.parse_args()
 
     msg = "Please enter one of the following commands:\n" \
-          "(1) --packages <p> --docker <d>,\n" \
+          "(1) --packages <p> --docker <c> --dir <d>,\n" \
           "(2) --help"
 
     return args
@@ -71,13 +72,13 @@ def main():
     args = get_params()
 
     try:
-        cp = ConPan(args.packages, args.docker)
+        cp = ConPan(args.packages, args.docker, args.dir)
         # cp.analyze()
         general_info, installed_packages, tracked_packages, vulnerabilities, bugs = cp.analyze()
         print('\nResults: ')
         print('General information about the Docker image: ', args.docker)
-        #for key in general_info:
-        #    print('-', str(key)+':', general_info[key])
+        for key in general_info:
+            print('-', str(key)+':', general_info[key])
 
         print('\nResults about installed packages in: ', args.docker)
         print('# installed packages:', len(installed_packages))

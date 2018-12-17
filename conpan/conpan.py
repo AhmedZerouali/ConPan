@@ -21,10 +21,11 @@
 #
 
 import logging
-import os
 import warnings
-from conpan.debian import Debian
+
 import pandas as pd
+
+from conpan.backend.debian import Debian
 from .errors import ParamsError
 
 warnings.simplefilter(action='ignore', category=Warning)
@@ -44,7 +45,7 @@ class ConPan:
     version = '0.1.0'
     description = 'ConPan, a tool to calculate analyze packages in Docker containers'
 
-    def __init__(self, packages=None, image=None):
+    def __init__(self, packages=None, image=None, dir_data=None):
         if not packages:
             raise ParamsError(cause="kind of packages cannot be null")
 
@@ -55,19 +56,17 @@ class ConPan:
             raise ParamsError(cause="the packages type is not supported yet")
 
         self.packages = str(packages).lower()
-        self.image = image
         self.VERO = True
         self.trackedPackages = pd.DataFrame()
 
         if self.packages == 'debian':
-            self.backend = Debian(self.image)
+            self.backend = Debian(image, dir_data)
 
     def analyze(self):
         """Analyze packages for the target Docker image
 
         :return dataframes with all installed packages, their technical lag, vulnerabilities and other kind of bugs.
         """
-
 
         ####### PROCESS #######
         print('Connecting to DockerHub... ', end='')

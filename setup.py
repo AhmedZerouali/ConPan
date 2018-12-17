@@ -26,7 +26,7 @@ setup(
         name='ConPan',
         version='0.1.0',
         description='ConPan: a tool to analyze your Docker container in peace',
-        long_description='ConPan inspect Docker containers and extarct their installed packages to analyze them. '
+        long_description='ConPan inspect Docker containers and extract their installed packages to analyze them. '
                          'ConPan analyze packages technical lag, vulnerabilities and other type of bugs.',
         license="GPLv3",
         url='https://github.com/neglectos/ConPan',
@@ -35,22 +35,22 @@ setup(
         author_email='mr.hmed@gmail.com',
 
         classifiers=[
-            'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
             'Intended Audience :: Science/Research',
             'Topic :: Scientific/Engineering :: Information Analysis',
-            'Programming Language :: Python :: 2',
-            'Programming Language :: Python :: 2.6',
-            'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3.5',
             'License :: OSI Approved :: GPL License'
         ],
         keywords='docker packages technical-lag',
         packages=[
-            'conpan'
+            'conpan',
+            'conpan.backend'
         ],
         install_requires=[
             'pandas>=0.22.0',
-            'requests>=2.18.2'
+            'requests>=2.18.2',
+            'psycopg2-binary>=2.7.4',
+            'psycopg2>=2.7.4'
         ],
         scripts=[
             'bin/conpan'
