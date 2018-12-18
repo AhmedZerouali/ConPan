@@ -9,11 +9,10 @@ The output is a three dataframes containers information about installed packages
 ConPan workflow is very simple:
 - Pulls the Docker image.
 - Runs it and extract installed packages.
-- Track installed packages from their package managers.
-- Inspect their technical lag: checks if they are outdated and how much they are lagging behind the latest available versions.
-- Identify vulnerable packages.
-- Identify other kind of bugs for installed packages.
-
+- Tracks installed packages from their package managers.
+- Inspects their technical lag: checks if they are outdated and how much they are lagging behind the latest available versions.
+- Identifies vulnerable packages.
+- Identifies other kind of bugs for installed packages.
 
 ## Requirements
 - docker-ce
@@ -54,6 +53,22 @@ Launching ConPan from command line does not require much effort.
 $ conpan -p debian -c debian:buster-slim -d Path-to/data
 ```
 ### Output
+```
+Results: 
+General information about the Docker image:  127labs/blog
+- pull_count: 12870
+- star_count: 0
+- description: 127Lab's blog powered by Ghost
+- last_updated: 2017-04-29T16:34:03.485881Z
+- full_size: 114209000
+
+Results about installed packages in:  127labs/blog
+# installed packages: 130
+# tracked packages: 130
+# vulnerabilities: 326
+# bugs: 2047
+```
+![alt text](https://raw.githubusercontent.com/neglectos/ConPan/master/analysis/Figure_1.png)
 
 ### From Python
 ConPan can be embedded in your Python scripts. Again, the effort of using it is minimum.
