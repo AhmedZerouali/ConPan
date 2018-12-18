@@ -3,10 +3,12 @@
 ConPan inspect Docker containers and extract their installed packages to analyze them. 
 
 ConPan analyzes packages technical lag, vulnerabilities and other type of bugs.
+The output is a three dataframes containers information about installed packages, how outdated they are, their vulnerabilities and other kind of bugs.
+
 ## How it works
 ConPan workflow is very simple:
 - Pulls the Docker image.
-- Run it and extract installed packages.
+- Runs it and extract installed packages.
 - Track installed packages from their package managers.
 - Inspect their technical lag: checks if they are outdated and how much they are lagging behind the latest available versions.
 - Identify vulnerable packages.
@@ -19,6 +21,7 @@ ConPan workflow is very simple:
 - requests>=2.18.2
 - psycopg2-binary>=2.7.4
 - psycopg2>=2.7.4
+- matplotlib
 - apt_pkg
 
 
@@ -50,6 +53,7 @@ Launching ConPan from command line does not require much effort.
 ```
 $ conpan -p debian -c debian:buster-slim -d Path-to/data
 ```
+### Output
 
 ### From Python
 ConPan can be embedded in your Python scripts. Again, the effort of using it is minimum.
