@@ -44,7 +44,8 @@ setup(
         keywords='docker packages technical-lag',
         packages=[
             'conpan',
-            'conpan.backend'
+            'conpan.backend',
+            'analysis'
         ],
         install_requires=[
             'pandas>=0.22.0',
