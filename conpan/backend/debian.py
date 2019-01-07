@@ -353,6 +353,11 @@ class Debian:
         sources = tracked_packages.groupby(['source', 'source_version', 'release_snapshot', 'date']).count().loc[:,
                   []].reset_index()
         deb_packages = self.read_csv(PACKAGES)
+
+        deb_packages['source'] = deb_packages['source'].apply(str)
+        sources['source'] = sources['source'].apply(str)
+        bugs['source'] = bugs['source'].apply(str)
+
         bugs = (bugs.
                 set_index(['source']).
                 merge(sources.
