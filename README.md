@@ -3,7 +3,7 @@
 ConPan inspect Docker containers and extract their installed packages to analyze them. 
 
 ConPan analyzes packages technical lag, vulnerabilities and other type of bugs.
-The output is a three dataframes containers information about installed packages, how outdated they are, their vulnerabilities and other kind of bugs.
+The output is a four pandas dataframes that contain general information about the analyzed DockerHub image, information about installed packages, how outdated they are, their vulnerabilities and other kind of bugs.
 
 ## How it works
 ConPan workflow is very simple:
