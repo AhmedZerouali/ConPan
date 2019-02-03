@@ -340,6 +340,7 @@ class Debian:
 
     def get_bugs(self,tracked_packages):
         """Track bugs of the installed package versions: version where bug found <= version used < version where the bug was fixed
+        After you extract the data, analyze it carefully; because sometimes the data coming from UDD is not correct.
         :param tracked_packages: packages found installed in the container
         :return bugs: knows bugs of the installed packages
         """
@@ -367,37 +368,21 @@ class Debian:
                       how='left').dropna().reset_index()
                 )
 
-        bugs = (bugs.
-                set_index(['source', 'found_in']).
-                merge(deb_packages.
-                      rename(columns={'date': 'date_found', 'source_version': 'found_in'}).
-                      set_index(['source', 'found_in']),
-                      left_index=True,
-                      right_index=True,
-                      how='left').dropna().reset_index().drop_duplicates()
-                )
-
         bugs['filtre'] = bugs.apply(
             lambda row: True if apt_pkg.version_compare(str(row['found_in']), str(row['source_version'])) <= 0
             else False, axis=1)
 
-        bugs = bugs.query('filtre==True')  # date_found<=date and
-
-        bugs = (bugs.
-                set_index(['source', 'fixed_in']).
-                merge(deb_packages.
-                      rename(columns={'date': 'date_fixed', 'source_version': 'fixed_in'}).
-                      set_index(['source', 'fixed_in']),
-                      left_index=True,
-                      right_index=True,
-                      how='left').fillna('undefined').reset_index().drop_duplicates()
-                )
-        deb_packages == self.read_csv(PACKAGES)
-        bugs['filtre'] = bugs.apply(
+        bugs['filtre2'] = bugs.apply(
             lambda row: True if apt_pkg.version_compare(str(row['source_version']), str(row['fixed_in'])) < 0
             else False, axis=1)
 
-        bugs = bugs.query('filtre==True')  # date_fixed>date
+        bugs['filtre3'] = bugs.apply(
+            lambda d: True if d['last_modified'].replace('-', '') < d['date'] and d['status'] == 'done'
+            else False, axis=1)
+
+        bugs = bugs.query('filtre==True and filtre2==True and filtre3!=True')
+
+        bugs.drop(['filtre','filtre2','filtre3'], axis=1, inplace=True)
 
         bugs = bugs.groupby(['debianbug', 'source']).first().reset_index()
 
