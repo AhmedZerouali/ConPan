@@ -139,11 +139,45 @@ class Debian:
 
         return data
 
+    def oudated_packages(self, tracked, packages):
+
+        """Compute the number of missing updates of installed package: How outdated packages are
+        :param tracked: set of installed package versions
+        :return packages: historical data of Debian
+        """
+        for x in packages:
+            packages[x] = packages[x].apply(str)
+        tracked = (tracked
+                   .set_index(['package', 'release_snapshot'])
+                   .merge(packages
+                          .set_index(['package', 'release_snapshot'])
+                          .rename(columns={'version': 'version_compare'}),
+                          left_index=True,
+                          right_index=True,
+                          how='left')
+                   .dropna()
+                   .reset_index()
+                   .drop_duplicates()
+                   )
+
+        tracked['outdate'] = tracked.apply(lambda d:
+                                             apt_pkg.version_compare(d['version'],
+                                                                     d['version_compare']) < 0,
+                                             axis=1)
+
+        tracked = (tracked.query('outdate == True')
+                   .groupby(['package', 'version'])
+                   .count()[['outdate']]
+                   .reset_index())
+
+        return tracked
+
     def track_packages(self, installed_packages):
         """Tracks installed packages to check if they are coming from Debian.
         :param installed_packages: packages found installed in the Container
         :return tracked_packages: packages found installed in the Container and coming from Debian.
         """
+
 
         debian_p = self.read_csv(PACKAGES)
 
@@ -155,9 +189,22 @@ class Debian:
                                   right_index=True,
                                   how='left')
                             ).reset_index().dropna()
-        for column in ['last_order', 'version_order']:
-            tracked_packages[column] = tracked_packages[column].apply(int)
-        tracked_packages['outdate'] = tracked_packages['last_order'] - tracked_packages['version_order']
+
+        tracked = self.oudated_packages(tracked_packages[['package', 'version', 'release_snapshot']],
+                                   debian_p[['package', 'version', 'release_snapshot', 'date']])
+
+        tracked_packages = (tracked_packages
+                             .set_index(['package', 'version'])
+                             .merge(tracked
+                                    .set_index(['package', 'version']),
+                                    left_index=True,
+                                    right_index=True,
+                                    how='left')
+                             .fillna(0)
+                             .reset_index()
+                             .drop_duplicates()
+                             )
+
         return tracked_packages
 
 
