@@ -25,46 +25,33 @@ class Analysis:
     :param docker: targets the Docker image
     """
 
-    def outdateness(self, tracked_packages, axis):
+    def piePlot(self, df, axis):
 
-        tracked_packages['isOutdate']=tracked_packages['outdate'].apply(lambda x: 'Up to date' if x==0
-                                                                       else 'Out of date')
+        if 'severity' in df.columns:
+            groupby = 'severity'
+            title = 'Bugs'
+        elif 'urgency' in df.columns:
+            groupby = 'urgency'
+            title = 'Vulnerabilities'
+        else:
+            groupby = 'isOutdate'
+            title = 'Installed Packages'
+            df['isOutdate'] = df['outdate'].apply(
+                lambda x: 'Up to date' if x==0
+                else 'Out of date')
 
-        ax=tracked_packages.groupby('isOutdate').count().plot(kind='pie',
-                                                              autopct='%1.1f%%',
-                                                              y='source',
-                                                              ax=axis,
-                                                              title='Installed Packages',
-                                                              fontsize=17)#, explode=explode)
+        ax = (df
+              .groupby(groupby)
+              .count()
+              .plot(kind='pie',
+                    autopct='%1.1f%%',
+                    y='source',
+                    ax=axis,
+                    title=title,
+                    fontsize=17,
+                    legend=None)#, explode=explode)
+              )
 
-        ax.legend('')
-        ax.set_ylabel('')
-        ax.tick_params(labelsize=30, width=4)
-        ax.figure.set_size_inches(5,5)
-
-    def security(self, vulnerabilities, axis):
-
-        ax=vulnerabilities.groupby('urgency').count().plot(kind='pie',
-                                                       autopct='%1.1f%%',
-                                                       y='source',
-                                                        ax=axis,
-                                                       title='Vulnerabilities',
-                                                       fontsize=17)#, explode=explode)
-
-        ax.legend('')
-        ax.set_ylabel('')
-        ax.tick_params(labelsize=30, width=4)
-        ax.figure.set_size_inches(5,5)
-
-    def bugs(self, bugs, axis):
-
-        ax=bugs.groupby('severity').count().plot(kind='pie',
-                                                 autopct='%1.1f%%',
-                                                 y='source',
-                                                 ax=axis,
-                                                 title='Bugs',
-                                                 fontsize=17)#, explode=explode)
-        ax.legend('')
         ax.set_ylabel('')
         ax.tick_params(labelsize=30, width=4)
         ax.figure.set_size_inches(5,5)

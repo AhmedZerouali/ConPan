@@ -83,21 +83,27 @@ def main():
 
         print('\nResults about installed packages in: ', args.docker)
         print('# installed packages:', len(installed_packages))
-        print('# tracked packages:', len(tracked_packages))
-        print('# vulnerabilities:', len(vulnerabilities))
-        print('# bugs:', len(bugs))
 
+        printings = ['# tracked packages','# vulnerabilities','# bugs']
         an = Analysis()
-        figure, axes = plt.subplots(1, 3)
-        figure.set_size_inches(15, 5)
 
-        an.outdateness(tracked_packages, axes[0])
-        an.security(vulnerabilities, axes[1])
+        subPlot = 0
+        for i, df in enumerate([tracked_packages,vulnerabilities,bugs]):
+            if len(df) > 0:
+                subPlot = subPlot + 1
+                print(printings[i],': ', len(df))
+
+        figure, axes = plt.subplots(1, subPlot)
+        figure.set_size_inches(subPlot*5, 5)
+
+        subPlot = 0
+        for df in [tracked_packages,vulnerabilities,bugs]:
+            if len(df) > 0:
+                an.piePlot(df, axes[subPlot])
+                subPlot = subPlot + 1
+
         axes[1].text(-3, -1.2, 'Stats about: ' + args.docker, fontsize=20, verticalalignment='top', color='blue')
-        an.bugs(bugs, axes[2])
         plt.show(figure)
-
-
 
     except Exception as e:
         logging.error(e, exc_info=True)
