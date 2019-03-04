@@ -27,7 +27,6 @@ import json as js
 import codecs
 import apt_pkg
 import psycopg2
-import requests
 apt_pkg.init_system()
 from conpan.errors import ParamsError
 warnings.simplefilter(action='ignore', category=Warning)
@@ -103,7 +102,7 @@ class Debian:
         except:
             return ''
 
-    def parse_debian(self):
+    def parse_packages(self):
         """Extracts installed packages in the Docker container
         :return data: a dataframe with the installed packages
         """
@@ -309,7 +308,7 @@ class Debian:
                     pass
         fcsv.close()
 
-    def merge_vuls(self, tracked_packages):
+    def get_vuls(self, tracked_packages):
         """Extracts and Merges vulnerabilities with tracked packages.
         :param tracked_packages: packages found installed in the container
         :return docker_vuls: knows vulnerabilities of the installed packages
@@ -434,43 +433,6 @@ class Debian:
         bugs = bugs.groupby(['debianbug', 'source']).first().reset_index()
 
         return bugs
-
-    def general_information(self):
-        """inspect information from the Docker api
-        :return results: general information about the analyzed Docker container
-        """
-
-        if ':' in self.image:
-            slug = self.image.split(':')[0]
-            tag = str(self.image.split(':')[1])
-        else:
-            slug = self.image
-            tag = 'latest'
-
-        if '/' in slug:
-            url = 'https://registry.hub.docker.com/v2/repositories/' + slug
-            slug_info = requests.get(url=url).json()
-            url = 'https://registry.hub.docker.com/v2/repositories/' + slug + '/tags/' + tag
-            tag_info = requests.get(url=url).json()
-
-        else:
-            url = 'https://registry.hub.docker.com/v2/repositories/library/' + slug
-            slug_info = requests.get(url=url).json()
-            url = 'https://registry.hub.docker.com/v2/repositories/library/' + slug + '/tags/' + tag
-            tag_info = requests.get(url=url).json()
-
-        keys = ['description', 'star_count', 'pull_count', 'full_size', 'last_updated', 'architectures']
-        results = {}
-        for key in keys:
-            try:
-                results[key] = str(tag_info[key])
-            except:
-                try:
-                    results[key] = str(slug_info[key])
-                except:
-                    pass
-
-        return results
 
     def remove_files(self):
         """Remove created files

@@ -93,17 +93,21 @@ def main():
                 subPlot = subPlot + 1
                 print(printings[i],': ', len(df))
 
-        figure, axes = plt.subplots(1, subPlot)
-        figure.set_size_inches(subPlot*5, 5)
 
-        subPlot = 0
-        for df in [tracked_packages,vulnerabilities,bugs]:
-            if len(df) > 0:
-                an.piePlot(df, axes[subPlot])
-                subPlot = subPlot + 1
+        if subPlot == 1 : # This is in the case where we only have information about outdateness
+            an.piePlot(tracked_packages, None)
+            plt.show()
+        else: # Now, we have other information like vulnerabilties and bugs
+            figure, axes = plt.subplots(1, subPlot)
+            figure.set_size_inches(subPlot * 5, 5)
+            subPlot = 0
+            for df in [tracked_packages,vulnerabilities,bugs]:
+                if len(df) > 0:
+                    an.piePlot(df, axes[subPlot])
+                    subPlot = subPlot + 1
 
-        axes[1].text(-3, -1.2, 'Stats about: ' + args.docker, fontsize=20, verticalalignment='top', color='blue')
-        plt.show(figure)
+            axes[1].text(-3, -1.2, 'Stats about: ' + args.docker, fontsize=20, verticalalignment='top', color='blue')
+            plt.show(figure)
 
     except Exception as e:
         logging.error(e, exc_info=True)

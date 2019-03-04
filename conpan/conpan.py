@@ -24,8 +24,11 @@ import logging
 import warnings
 
 import pandas as pd
+import requests
 
 from conpan.backend.debian import Debian
+from conpan.backend.npm import npm
+
 from .errors import ParamsError
 
 warnings.simplefilter(action='ignore', category=Warning)
@@ -34,7 +37,7 @@ log = logging.getLogger()
 console = logging.StreamHandler()
 log.addHandler(console)
 
-allPackages = ['debian']
+allPackages = ['debian','npm']
 
 class ConPan:
     """ConPan, a tool to calculate analyze packages in Docker containers
@@ -55,12 +58,16 @@ class ConPan:
         if str(packages).lower() not in allPackages:
             raise ParamsError(cause="the packages type is not supported yet")
 
+        self.image = image
         self.packages = str(packages).lower()
         self.VERO = True
         self.trackedPackages = pd.DataFrame()
 
         if self.packages == 'debian':
             self.backend = Debian(image, dir_data)
+
+        if self.packages == 'npm':
+            self.backend = npm(image, dir_data)
 
     def analyze(self):
         """Analyze packages for the target Docker image
@@ -86,14 +93,50 @@ class ConPan:
         vulnerabilities = self.vulnerabilities()
 
         print('Done\nIdentifying other kind of bugs... ', end='')
+
         bugs = self.bugs()
+        #bugs = pd.DataFrame()
+
         print('Done\n')
         self.remove_files()
         return general_info, installed_packages, tracked_packages, vulnerabilities, bugs
 
     def general_info(self):
-        general_information = self.backend.general_information()
-        return general_information
+        """inspect information from the Docker api
+        :return results: general information about the analyzed Docker container
+        """
+
+        if ':' in self.image:
+            slug = self.image.split(':')[0]
+            tag = str(self.image.split(':')[1])
+        else:
+            slug = self.image
+            tag = 'latest'
+
+        if '/' in slug:
+            url = 'https://registry.hub.docker.com/v2/repositories/' + slug
+            slug_info = requests.get(url=url).json()
+            url = 'https://registry.hub.docker.com/v2/repositories/' + slug + '/tags/' + tag
+            tag_info = requests.get(url=url).json()
+
+        else:
+            url = 'https://registry.hub.docker.com/v2/repositories/library/' + slug
+            slug_info = requests.get(url=url).json()
+            url = 'https://registry.hub.docker.com/v2/repositories/library/' + slug + '/tags/' + tag
+            tag_info = requests.get(url=url).json()
+
+        keys = ['description', 'star_count', 'pull_count', 'full_size', 'last_updated', 'architectures']
+        results = {}
+        for key in keys:
+            try:
+                results[key] = str(tag_info[key])
+            except:
+                try:
+                    results[key] = str(slug_info[key])
+                except:
+                    pass
+
+        return results
 
     def download(self):
         self.backend.download()
@@ -102,7 +145,7 @@ class ConPan:
         if self.VERO:
             self.download()
             self.VERO = False
-        installed_packages =  self.backend.parse_debian()
+        installed_packages =  self.backend.parse_packages()
         return installed_packages
 
     def tracked_packages(self):
@@ -113,7 +156,7 @@ class ConPan:
     def vulnerabilities(self):
         if len(self.trackedPackages) == 0:
             self.trackedPackages = self.tracked_packages()
-        return self.backend.merge_vuls(self.trackedPackages)
+        return self.backend.get_vuls(self.trackedPackages)
 
     def bugs(self):
         if len(self.trackedPackages) == 0:
