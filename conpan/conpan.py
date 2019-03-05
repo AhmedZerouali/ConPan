@@ -94,8 +94,8 @@ class ConPan:
 
         print('Done\nIdentifying other kind of bugs... ', end='')
 
-        #bugs = self.bugs()
-        bugs = pd.DataFrame()
+        bugs = self.bugs()
+        #bugs = pd.DataFrame()
 
         print('Done\n')
         self.remove_files()
