@@ -22,23 +22,25 @@
 import os
 import subprocess
 import pandas as pd
-import warnings
-import json as js
-import codecs
 import apt_pkg
-import psycopg2
-import requests
 apt_pkg.init_system()
-from conpan.errors import ParamsError
+import logging
+logger = logging.getLogger(__name__)
+import re
+import requests
+from urllib.parse import urljoin
+import warnings
 warnings.simplefilter(action='ignore', category=Warning)
 
-VULS_JSON = 'vulnerabilities.json'
-PACKAGES = 'packages.csv'
-VULS_CSV = 'vulnerabilities.csv'
-BUGS_CSV = 'bugs.csv'
+from conpan.errors import ParamsError
 
+NPM_URL = 'http://registry.npmjs.org'
 removed = False
 
+RELEASE_MINOR = 'minor'
+RELEASE_MAJOR = 'major'
+RELEASE_PATCH = 'patch'
+RE = r'^(?:v|V)?(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(?P<misc>.+)?$'
 
 class npm:
     """npm, a backend to analyze npm packages
@@ -73,6 +75,22 @@ class npm:
             os.system("docker stop $(docker ps -a | grep '" + self.image + " ' | cut -d' ' -f1)")
             os.system("docker rm $(docker ps -a | grep '" + self.image + " ' | cut -d' ' -f1)")
 
+
+    def fetch_from_url(self, url):
+        """Fetch package information from a URL and return its content.
+        :param url: the target url
+        :return: the content of the url
+        """
+        response = requests.get(url)
+
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as error:
+            logger.error(error)
+
+        to_json = response.json()
+        return to_json
+
     def parse_packages(self):
         """Extracts installed packages in the Docker container
         :return data: a dataframe with the installed packages
@@ -94,6 +112,104 @@ class npm:
 
         return df
 
+    def get_versions(self, package):
+        """Get the version of a given package.
+        :param package: target package name
+        :return: pandas data frame of package versions
+        """
+        url = urljoin(NPM_URL, package)
+        versions = self.fetch_from_url(url)['time']
+        versions.pop('modified')
+        versions.pop('created')
+        versions = (pd.DataFrame({'version': list(versions.keys()),
+                                  'date': list(versions.values()),
+                                  'package': package}))
+
+        versions['version'] = versions['version'].apply(lambda x: x.split('-')[0])
+        versions.drop_duplicates(inplace=True)
+
+        return versions
+
+    def convert_version(self, version):
+        """Convert version to a numeric value.
+        :param version: the version of a package
+        :return: a numeric value of the package version
+        """
+        major = 0
+        minor = 0
+        patch = 0
+
+        prog = re.compile("^\d+(\.\d+)*$")
+        result = prog.match(version)
+
+        if not result:
+            msg = "Impossible to convert version %s" % version
+            raise ParamsError(cause=msg)
+
+        groups = version.split('.')
+        if len(groups) >= 1:
+            major = int(groups[0]) * 1000000
+        if len(groups) >= 2:
+            minor = int(groups[1]) * 1000
+        if len(groups) >= 3:
+            patch = int(groups[2])
+
+        return major + minor + patch
+
+    def release_type(self, old_version, new_version):
+        """Determine the type of a release by comparing two versions. The
+        outcome can be: major, minor or patch.
+        :param old_version: The source version of a package
+        :param new_version: The target version of a package
+        :return: the type of the release
+        """
+        old_version = str(old_version).split('.')
+        new_version = str(new_version).split('.')
+
+        release = RELEASE_PATCH
+        if new_version[0] != old_version[0]:
+            release = RELEASE_MAJOR
+        elif new_version[1] != old_version[1]:
+            release = RELEASE_MINOR
+
+        return release
+
+    def compute_lag(self, versions, used):
+        """Compute the technical lag for the set of versions of a given package.
+        :param versions: pandas data frame of the package versions
+        :param used: version in use of the package
+        :param latest: latest version available of the package
+        :return: the technical lag
+        """
+
+        versions['vc_converted'] = versions['version'].apply(lambda v: self.convert_version(v))
+        versions.sort_values('vc_converted', ascending=True, inplace=True)
+
+        latest = versions.version.tolist()[-1]
+        used = self.convert_version(used.split('-')[0])
+
+        versions['version_old'] = versions['version'].shift(1)
+        versions['release_type'] = versions.apply(lambda d:
+                                                  self.release_type(d['version_old'], d['version']),
+                                                  axis=1)
+        
+        versions = versions.query('vc_converted>' + str(used))
+
+        if len(versions) == 0:
+            return {RELEASE_MAJOR: 0, RELEASE_MINOR: 0, RELEASE_PATCH: 0, 'latest': latest}
+
+
+        lag = versions.groupby('release_type').count()[['version']].to_dict()['version']
+        lag['latest'] = latest
+
+        if RELEASE_MAJOR not in lag.keys():
+            lag[RELEASE_MAJOR] = 0
+        if RELEASE_MINOR not in lag.keys():
+            lag[RELEASE_MINOR] = 0
+        if RELEASE_PATCH not in lag.keys():
+            lag[RELEASE_PATCH] = 0
+
+        return lag
 
     def track_packages(self, installed_packages):
         """Tracks installed packages from npm.
@@ -101,8 +217,24 @@ class npm:
         :return tracked_packages: tracked packages from npm
         """
 
+        installed_packages[RELEASE_MAJOR + '_lag'] = ''
+        installed_packages[RELEASE_MINOR + '_lag'] = ''
+        installed_packages[RELEASE_PATCH + '_lag'] = ''
+        installed_packages['latest'] = ''
+
+        for row in range(0, len(installed_packages)):
+            packages_registry = self.get_versions(installed_packages.iloc[row].package)
+            lag = self.compute_lag(packages_registry, installed_packages.iloc[row].version)
+
+            installed_packages.major_lag.iloc[row] = lag[RELEASE_MAJOR]
+            installed_packages.minor_lag.iloc[row] = lag[RELEASE_MINOR]
+            installed_packages.patch_lag.iloc[row] = lag[RELEASE_PATCH]
+            installed_packages.latest.iloc[row] = lag['latest']
+
         # NOT IMPLEMENTED YET
-        installed_packages['outdate'] = 0
+        installed_packages['outdate'] = installed_packages.apply(lambda d:
+                                                                 d['major_lag']+d['minor_lag']+d['patch_lag'],
+                                                                 axis=1)
         return installed_packages
 
     def get_vuls(self, tracked_packages):
@@ -113,7 +245,6 @@ class npm:
 
         # NOT IMPLEMENTED YET
         return pd.DataFrame()
-
 
     def get_bugs(self, tracked_packages):
 

@@ -84,24 +84,23 @@ def main():
         print('\nResults about installed packages in: ', args.docker)
         print('# installed packages:', len(installed_packages))
 
-        printings = ['# tracked packages','# vulnerabilities','# bugs']
+        printings = ['# tracked packages', '# vulnerabilities', '# bugs']
         an = Analysis()
 
         subPlot = 0
-        for i, df in enumerate([tracked_packages,vulnerabilities,bugs]):
+        for i, df in enumerate([tracked_packages, vulnerabilities, bugs]):
             if len(df) > 0:
                 subPlot = subPlot + 1
-                print(printings[i],': ', len(df))
+                print(printings[i], ': ', len(df))
 
-
-        if subPlot == 1 : # This is in the case where we only have information about outdateness
+        if subPlot == 1:  # This is in the case where we only have information about outdateness
             an.piePlot(tracked_packages, None)
             plt.show()
-        else: # Now, we have other information like vulnerabilties and bugs
+        else:  # Now, we have other information like vulnerabilities and bugs
             figure, axes = plt.subplots(1, subPlot)
             figure.set_size_inches(subPlot * 5, 5)
             subPlot = 0
-            for df in [tracked_packages,vulnerabilities,bugs]:
+            for df in [tracked_packages, vulnerabilities, bugs]:
                 if len(df) > 0:
                     an.piePlot(df, axes[subPlot])
                     subPlot = subPlot + 1
