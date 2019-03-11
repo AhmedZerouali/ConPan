@@ -24,7 +24,7 @@ from setuptools import setup
 
 setup(
         name='ConPan',
-        version='0.1.0',
+        version='1.0.0',
         description='ConPan: a tool to analyze your Docker container in peace',
         long_description='ConPan inspect Docker containers and extract their installed packages to analyze them. '
                          'ConPan analyze packages technical lag, vulnerabilities and other type of bugs.',
