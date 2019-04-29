@@ -45,7 +45,7 @@ class Analysis:
               .count()
               .plot(kind='pie',
                     autopct='%1.1f%%',
-                    y='package',
+                    y='source',
                     ax=axis,
                     title=title,
                     fontsize=17,
