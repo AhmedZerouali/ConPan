@@ -15,13 +15,15 @@ ConPan workflow is very simple:
 - Identifies other kind of bugs for installed packages.
 
 ## Requirements
-- docker-ce
+**Python modules:**
 - pandas>=0.22.0
 - requests>=2.18.2
 - psycopg2-binary>=2.7.4
-- psycopg2>=2.7.4
-- matplotlib
-- apt_pkg
+- matplotlib>=3.0.0
+
+**Other:**
+- docker-ce (https://docs.docker.com/install/)
+- apt_pkg (```sudo apt-get install python3-apt```)
 
 
 ##  How to install/uninstall
@@ -50,9 +52,17 @@ You will need permission to use the Docker tool first.
 Launching ConPan from command line does not require much effort.
 
 ```
-$ conpan -p debian -c debian:buster-slim -d Path-to/data
+$ conpan -p <package_type> -c <image> -d <Path-to/data>
 ```
-### Output
+
+**Example:**
+
+```
+$ conpan -p debian -c 127labs/blog -d ~/ConPan/data/debian
+```
+
+**Output:**
+
 ```
 Results: 
 General information about the Docker image:  127labs/blog
@@ -78,7 +88,7 @@ ConPan can be embedded in your Python scripts. Again, the effort of using it is 
 from conpan.conpan import ConPan
 
 # With 2 parameters
-image_community = 'weboaks/chromium-xvfb-node'
+image_community = '127labs/blog'
 image_official = 'debian:buster-slim'
 dir_data = 'Path-to/data/'
 
