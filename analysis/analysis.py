@@ -36,7 +36,7 @@ class Analysis:
         else:
             groupby = 'isOutdate'
             title = 'Installed Packages'
-            df['isOutdate'] = df['outdate'].apply(
+            df['isOutdate'] = df['missing_updates'].apply(
                 lambda x: 'Up to date' if x==0
                 else 'Out of date')
 

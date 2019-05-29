@@ -57,7 +57,7 @@ class Debian:
         :param CSV: the csv file to read
         :return df: dataframe of the csv file
         """
-        df = pd.read_csv(self.data_dir + CSV, sep=';', dtype=object, index_col=None, error_bad_lines=False)
+        df = pd.read_csv(self.data_dir + CSV, sep=';', dtype=object, index_col=None)
         df.drop_duplicates(inplace=True)
 
         return df
@@ -124,9 +124,9 @@ class Debian:
         data = data.append(df)
         data.set_index('name', inplace=True)
 
-        data['release_number'] = self.parse_release
+        data['debian_release'] = self.parse_release
 
-        data['debian'] = data['release_number'].apply(lambda x: 'jessie' if x.startswith('8')
+        data['image_debian'] = data['debian_release'].apply(lambda x: 'jessie' if x.startswith('8')
                                                                           else 'stretch' if x.startswith('9')
                                                                           else 'wheezy' if x.startswith('7')
                                                                           else 'squeeze' if x.startswith('6')
@@ -147,9 +147,9 @@ class Debian:
         for x in packages:
             packages[x] = packages[x].apply(str)
         tracked = (tracked
-                   .set_index(['package', 'release_snapshot'])
+                   .set_index(['package', 'first_seen'])
                    .merge(packages
-                          .set_index(['package', 'release_snapshot'])
+                          .set_index(['package', 'first_seen'])
                           .rename(columns={'version': 'version_compare'}),
                           left_index=True,
                           right_index=True,
@@ -159,14 +159,14 @@ class Debian:
                    .drop_duplicates()
                    )
 
-        tracked['outdate'] = tracked.apply(lambda d:
+        tracked['missing_updates'] = tracked.apply(lambda d:
                                              apt_pkg.version_compare(d['version'],
                                                                      d['version_compare']) < 0,
                                              axis=1)
 
-        tracked = (tracked.query('outdate == True')
+        tracked = (tracked.query('missing_updates == True')
                    .groupby(['package', 'version'])
-                   .count()[['outdate']]
+                   .count()[['missing_updates']]
                    .reset_index())
 
         return tracked
@@ -189,8 +189,8 @@ class Debian:
                                   how='left')
                             ).reset_index().dropna()
 
-        tracked = self.oudated_packages(tracked_packages[['package', 'version', 'release_snapshot']],
-                                   debian_p[['package', 'version', 'release_snapshot', 'date']])
+        tracked = self.oudated_packages(tracked_packages[['package', 'version', 'first_seen']],
+                                   debian_p[['package', 'version', 'first_seen', 'package_date']])
 
         tracked_packages = (tracked_packages
                              .set_index(['package', 'version'])
@@ -215,8 +215,8 @@ class Debian:
 
         debian_p = self.read_csv(PACKAGES)
         df_packages = (debian_p.
-                       sort_values('date', ascending=True).
-                       groupby(['source', 'source_version', 'release_snapshot']).
+                       sort_values('package_date', ascending=True).
+                       groupby(['source', 'source_version', 'first_seen']).
                        first().
                        drop(['package', 'version'], axis=1)
                        )
@@ -224,10 +224,10 @@ class Debian:
         dict_date = df_packages.to_dict()  # dict of source version dates
 
         df_packages_release = (debian_p.
-                               sort_values('date', ascending=True).
+                               sort_values('package_date', ascending=True).
                                groupby(['source', 'source_version']).
                                first().
-                               drop(['package', 'version', 'date'], axis=1)
+                               drop(['package', 'version', 'package_date'], axis=1)
                                )
 
         dict_release = df_packages_release.to_dict()  # dict of releases
@@ -266,13 +266,13 @@ class Debian:
         sorted_ip = self.unique_installed_packages(tracked_packages)
 
         fcsv = open(self.data_dir + VULS_CSV, 'w')
-        fcsv.write('source;source_version;urgency;status;fixed_version;debianbug;release;cve\n')
+        fcsv.write('source;source_version;urgency;status;fixed_in;debianbug;cve\n')
 
         for index, raw in enumerate(sorted_ip.iterrows()):  # we iterate over the sources (docker)
             source = raw[1]['source']
             source_version = raw[1]['source_version']
-            release = dict_release['release_snapshot'][(source, source_version)]
-            date_source = dict_date['date'][(source, source_version, release)]
+            release = dict_release['first_seen'][(source, source_version)]
+            date_source = dict_date['package_date'][(source, source_version, release)]
             try:
                 vuls = vulnerabilities[source]  # check if the source has any vulnerabilities
             except:
@@ -292,8 +292,7 @@ class Debian:
 
                     if status == "open" or status == "undetermined":  # if the vulnerability is still OPEN
                         fixed = "undefined"
-                        fcsv.write(
-                            source + ';' + source_version + ';' + urgency + ';' + status + ';' + fixed + ';' + debianbug + ';' + release + ';' + cve + '\n')
+                        fcsv.write(';'.join([source, source_version, urgency, status, fixed, debianbug, cve]) + '\n')
                     else:  # if the vulnerability is RESOLVED
                         try:
                             fixed = v['releases'][release]["fixed_version"]
@@ -301,8 +300,7 @@ class Debian:
                             continue
                         if apt_pkg.version_compare(source_version,
                                                    fixed) < 0:  # Compare between the used source and fixed one (dates comparison)
-                            fcsv.write(
-                                source + ';' + source_version + ';' + urgency + ';' + status + ';' + fixed + ';' + debianbug + ';' + release + ';' + cve + '\n')
+                            fcsv.write(';'.join([source, source_version, urgency, status, fixed, debianbug, cve]) + '\n')
 
                 except:
                     pass
@@ -317,15 +315,18 @@ class Debian:
 
         vuls = self.read_csv(VULS_CSV)  # GET VULNERABILITIES
 
-        docker_vuls = (
-            tracked_packages.
-                set_index(['source', 'source_version']).
-                merge(vuls.
-                      set_index(['source', 'source_version']),
-                      left_index=True,
-                      right_index=True,
-                      how='outer').dropna().reset_index().drop_duplicates()
+        docker_vuls = (tracked_packages
+                       .set_index(['source', 'source_version'])[['missing_updates']]
+                       .merge(vuls
+                              .set_index(['source', 'source_version']),
+                              left_index=True,
+                              right_index=True,
+                              how='left')
+                       .dropna()
+                       .reset_index()
+                       .drop_duplicates()
         )
+
         return docker_vuls
 
     def connexion_udd(self):
@@ -363,9 +364,7 @@ class Debian:
             data = cursor.fetchall()
             for x in data:
                 id, status, severity, arrival, last_modified, found_in, fixed_in = x
-                f.write(source + ';' + str(id) + ';' + found_in + ';' + str(
-                    fixed_in) + ';normal;' + status + ';' + severity + ';' + str(arrival) + ';' + str(
-                    last_modified) + '\n')
+                f.write(';'.join([source, str(id), found_in, str(fixed_in), 'normal', status, severity, str(arrival), str(last_modified)]) + '\n')
 
             cursor.execute(
                 "SELECT DISTINCT archived_bugs.id, archived_bugs.status, archived_bugs.severity, " +
@@ -378,9 +377,7 @@ class Debian:
             data2 = cursor.fetchall()
             for x in data2:
                 id, status, severity, arrival, last_modified, found_in, fixed_in = x
-                f.write(source + ';' + str(id) + ';' + found_in + ';' + str(
-                    fixed_in) + ';archived;' + status + ';' + severity + ';' + str(arrival) + ';' + str(
-                    last_modified) + '\n')
+                f.write(';'.join([source, str(id), found_in, str(fixed_in), 'archived', status, severity, str(arrival), str(last_modified)]) + '\n')
 
         f.close()
 
@@ -397,21 +394,18 @@ class Debian:
         bugs['fixed_in'] = bugs['fixed_in'].apply(lambda x: str(x).split('/')[-1])
         bugs['found_in'] = bugs['found_in'].apply(lambda x: str(x).split('/')[-1])
 
-        sources = tracked_packages.groupby(['source', 'source_version', 'release_snapshot', 'date']).count().loc[:,
-                  []].reset_index()
-        deb_packages = self.read_csv(PACKAGES)
-
-        deb_packages['source'] = deb_packages['source'].apply(str)
-        sources['source'] = sources['source'].apply(str)
         bugs['source'] = bugs['source'].apply(str)
 
-        bugs = (bugs.
-                set_index(['source']).
-                merge(sources.
-                      set_index(['source']),
-                      left_index=True,
-                      right_index=True,
-                      how='left').dropna().reset_index()
+        bugs = (tracked_packages
+                .set_index(['source'])[['source_version', 'missing_updates', 'package_date']]
+                .merge(bugs
+                       .set_index(['source']),
+                       left_index=True,
+                       right_index=True,
+                       how='left')
+                .dropna()
+                .drop_duplicates()
+                .reset_index()
                 )
 
         bugs['filtre'] = bugs.apply(
@@ -423,18 +417,18 @@ class Debian:
             else False, axis=1)
 
         bugs['filtre3'] = bugs.apply(
-            lambda d: True if d['last_modified'].replace('-', '') < d['date'] and d['status'] == 'done'
+            lambda d: True if d['last_modified'].replace('-', '') < d['package_date'] and d['status'] == 'done'
             else False, axis=1)
 
         bugs = bugs.query('filtre==True and filtre2==True and filtre3!=True')
 
-        bugs.drop(['filtre','filtre2','filtre3'], axis=1, inplace=True)
+        bugs.drop(['filtre', 'filtre2', 'filtre3', 'package_date'], axis=1, inplace=True)
 
         bugs = bugs.groupby(['debianbug', 'source']).first().reset_index()
 
         return bugs
 
-    def remove_files(self):
+    def remove_files(self): # I am not sure if this is needed
         """Remove created files
         """
         os.system('rm {0}{1}'.format(self.data_dir, BUGS_CSV))

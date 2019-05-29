@@ -232,7 +232,7 @@ class npm:
             installed_packages.latest.iloc[row] = lag['latest']
 
         # NOT IMPLEMENTED YET
-        installed_packages['outdate'] = installed_packages.apply(lambda d:
+        installed_packages['missing_updates'] = installed_packages.apply(lambda d:
                                                                  d['major_lag']+d['minor_lag']+d['patch_lag'],
                                                                  axis=1)
         return installed_packages

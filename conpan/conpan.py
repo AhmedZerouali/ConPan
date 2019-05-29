@@ -98,7 +98,6 @@ class ConPan:
         #bugs = pd.DataFrame()
 
         print('Done\n')
-        self.remove_files()
         return general_info, installed_packages, tracked_packages, vulnerabilities, bugs
 
     def general_info(self):
