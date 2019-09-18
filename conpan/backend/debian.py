@@ -27,12 +27,14 @@ import json as js
 import codecs
 import apt_pkg
 import psycopg2
+import io
+import requests
 apt_pkg.init_system()
 from conpan.errors import ParamsError
 warnings.simplefilter(action='ignore', category=Warning)
 
 VULS_JSON = 'vulnerabilities.json'
-PACKAGES = 'packages.csv'
+PACKAGES = 'https://raw.githubusercontent.com/neglectos/datasets/master/debian_packages.csv'
 VULS_CSV = 'vulnerabilities.csv'
 BUGS_CSV = 'bugs.csv'
 
@@ -58,6 +60,17 @@ class Debian:
         :return df: dataframe of the csv file
         """
         df = pd.read_csv(self.data_dir + CSV, sep=';', dtype=object, index_col=None)
+        df.drop_duplicates(inplace=True)
+
+        return df
+
+    def read_csv_url(slef,url):
+        """Reads a csv file from url
+        :param url: the url of the csv file to read
+        :return df: dataframe of the csv file
+        """
+        content = requests.get(url).content
+        df = pd.read_csv(io.StringIO(content.decode('utf-8')), dtype=object, index_col=None)
         df.drop_duplicates(inplace=True)
 
         return df
@@ -178,7 +191,7 @@ class Debian:
         """
 
 
-        debian_p = self.read_csv(PACKAGES)
+        debian_p = self.read_csv_url(PACKAGES)
 
         tracked_packages = (installed_packages.
                             set_index(['package', 'version']).
@@ -213,7 +226,7 @@ class Debian:
         :return dict_release: a dictionary with packages and their Debian release version.
         """
 
-        debian_p = self.read_csv(PACKAGES)
+        debian_p = self.read_csv_url(PACKAGES)
         df_packages = (debian_p.
                        sort_values('package_date', ascending=True).
                        groupby(['source', 'source_version', 'first_seen']).
@@ -272,7 +285,6 @@ class Debian:
             source = raw[1]['source']
             source_version = raw[1]['source_version']
             release = dict_release['first_seen'][(source, source_version)]
-            date_source = dict_date['package_date'][(source, source_version, release)]
             try:
                 vuls = vulnerabilities[source]  # check if the source has any vulnerabilities
             except:
