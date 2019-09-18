@@ -23,17 +23,16 @@ import os
 import subprocess
 import pandas as pd
 import warnings
-import json as js
-import codecs
 import apt_pkg
 import psycopg2
 import io
 import requests
 apt_pkg.init_system()
-from conpan.errors import ParamsError
+import logging
+logger = logging.getLogger(__name__)
 warnings.simplefilter(action='ignore', category=Warning)
 
-VULS_JSON = 'vulnerabilities.json'
+VULS_JSON = 'https://security-tracker.debian.org/tracker/data/json'
 PACKAGES = 'https://raw.githubusercontent.com/neglectos/datasets/master/debian_packages.csv'
 VULS_CSV = 'vulnerabilities.csv'
 BUGS_CSV = 'bugs.csv'
@@ -75,13 +74,20 @@ class Debian:
 
         return df
 
-    def parse_json_vuls(self):
-        """Loads a JSON file
-        :return json: json object
+    def json_from_url(self, url):
+        """Fetch package information from a URL and return its content.
+        :param url: the target url
+        :return: the content of the url
         """
+        response = requests.get(url)
 
-        json = js.load(codecs.open(self.data_dir + VULS_JSON, 'r', 'utf-8'))
-        return json
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as error:
+            logger.error(error)
+
+        to_json = response.json()
+        return to_json
 
     def command_system(self, cmd):
         """Excutes a Shell command
@@ -272,7 +278,7 @@ class Debian:
         :return
         """
 
-        vulnerabilities = self.parse_json_vuls()
+        vulnerabilities = self.json_from_url(VULS_JSON)
 
         dict_date, dict_release = self.dates_release_debian()
 
