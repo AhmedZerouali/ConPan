@@ -368,7 +368,7 @@ class Debian:
         sources = tracked_packages.source.drop_duplicates().values
         normal = []
         archive = []
-        for source in tqdm(sources[0:1]):
+        for source in tqdm(sources):
             cursor.execute(
                 "SELECT DISTINCT bugs.source, bugs.id, bugs.status, bugs.severity, " +
                 "bugs.arrival, bugs.last_modified, bugs_found_in.version, bugs_fixed_in.version " +

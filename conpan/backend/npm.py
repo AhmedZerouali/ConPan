@@ -22,8 +22,6 @@
 import os
 import subprocess
 import pandas as pd
-import apt_pkg
-apt_pkg.init_system()
 import logging
 logger = logging.getLogger(__name__)
 import re
