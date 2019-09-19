@@ -23,13 +23,12 @@ import os
 import subprocess
 import pandas as pd
 import warnings
-import apt_pkg
 import psycopg2
 import io
 from tqdm import tqdm
 import requests
-apt_pkg.init_system()
 import logging
+import re
 logger = logging.getLogger(__name__)
 warnings.simplefilter(action='ignore', category=Warning)
 
@@ -37,8 +36,17 @@ VULS_JSON = 'https://security-tracker.debian.org/tracker/data/json'
 PACKAGES = 'https://raw.githubusercontent.com/neglectos/datasets/master/debian_packages.csv'
 VULS_CSV = 'vulnerabilities.csv'
 BUGS_CSV = 'bugs.csv'
-
 removed = False
+
+re_all_digits_or_not = re.compile("\d+|\D+")
+re_digits = re.compile("\d+")
+re_digit = re.compile("\d")
+re_alpha = re.compile("[A-Za-z]")
+
+re_valid_version = re.compile(
+            r"^((?P<epoch>\d+):)?"
+             "(?P<upstream_version>[A-Za-z0-9.+:~-]+?)"
+             "(-(?P<debian_revision>[A-Za-z0-9+.~]+))?$")
 
 
 class Debian:
@@ -94,7 +102,6 @@ class Debian:
         """Excutes a Shell command
         :return result: the output of the command
         """
-
         result = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
         result = list(filter(lambda x: len(x) > 0, (line.strip().decode('utf-8') for line in result.stdout)))
 
@@ -180,7 +187,7 @@ class Debian:
                    )
 
         tracked['missing_updates'] = tracked.apply(lambda d:
-                                             apt_pkg.version_compare(d['version'],
+                                             self.compare(d['version'],
                                                                      d['version_compare']) < 0,
                                              axis=1)
 
@@ -251,7 +258,6 @@ class Debian:
         dict_release = df_packages_release.to_dict()  # dict of releases
         return dict_date, dict_release
 
-
     def unique_installed_packages(self,tracked_packages):
         """Identify unique source packages.
         A source package may have many binary packages.
@@ -309,7 +315,7 @@ class Debian:
                             fixed = v['releases'][release]["fixed_version"]
                         except:
                             continue
-                        if apt_pkg.version_compare(source_version,fixed) >= 0:  # Compare between the used source and fixed one (dates comparison)
+                        if self.compare(source_version,fixed) >= 0:  # Compare between the used source and fixed one (dates comparison)
                             continue
                     tcsv.append([source, source_version,urgency,status,fixed,debianbug,cve])
 
@@ -323,8 +329,6 @@ class Debian:
             df[col] = tcsv[index]
 
         return df
-
-
 
     def get_vuls(self, tracked_packages):
         """Extracts and Merges vulnerabilities with tracked packages.
@@ -364,7 +368,7 @@ class Debian:
         sources = tracked_packages.source.drop_duplicates().values
         normal = []
         archive = []
-        for source in tqdm(sources):
+        for source in tqdm(sources[0:1]):
             cursor.execute(
                 "SELECT DISTINCT bugs.source, bugs.id, bugs.status, bugs.severity, " +
                 "bugs.arrival, bugs.last_modified, bugs_found_in.version, bugs_fixed_in.version " +
@@ -431,8 +435,8 @@ class Debian:
                 )
 
         mask = bugs.apply(
-            lambda row: True if apt_pkg.version_compare(str(row['found_in']), str(row['source_version'])) <= 0
-            and apt_pkg.version_compare(str(row['source_version']), str(row['fixed_in'])) < 0
+            lambda row: True if self.compare(str(row['found_in']), str(row['source_version'])) <= 0
+            and self.compare(str(row['source_version']), str(row['fixed_in'])) < 0
             else False, axis=1)
         # Filtre on bugs that were created before the creation of the package and fixed after that (or not)
         bugs = bugs[mask]
@@ -449,6 +453,79 @@ class Debian:
         bugs = bugs.groupby(['debianbug', 'source']).first().reset_index()
 
         return bugs
+
+    def cmp(self,a, b):
+        """Compares between two integers. Normally this exists in python, but JIC"""
+        if a == b:
+            return 0
+        elif a < b:
+            return -1
+        else:
+            return 1
+
+    def order(self,x):
+        """Returns an integer value for character x"""
+        if x == '~':
+            return -1
+        elif re_digit.match(x):
+            return int(x) + 1
+        elif re_alpha.match(x):
+            return ord(x)
+        else:
+            return ord(x) + 256
+
+    def version_cmp_string(self,va, vb):
+        """Compares between two string"""
+        la = [self.order(x) for x in va]
+        lb = [self.order(x) for x in vb]
+        while la or lb:
+            a = 0
+            b = 0
+            if la:
+                a = la.pop(0)
+            if lb:
+                b = lb.pop(0)
+            res = self.cmp(a, b)
+            if res != 0:
+                return res
+        return 0
+
+    def version_cmp_part(self,va, vb):
+        """Compares between two parts of a version, e.g. epoch_1 vs epoch_2 """
+        la = re_all_digits_or_not.findall(va)
+        lb = re_all_digits_or_not.findall(vb)
+        while la or lb:
+            a = "0"
+            b = "0"
+            if la:
+                a = la.pop(0)
+            if lb:
+                b = lb.pop(0)
+            if re_digits.match(a) and re_digits.match(b):
+                a = int(a)
+                b = int(b)
+                res = self.cmp(a, b)
+                if res != 0:
+                    return res
+            else:
+                res = self.version_cmp_string(a, b)
+                if res != 0:
+                    return res
+        return 0
+
+    def compare(self,a, b):
+        """Compares between two version numbers"""
+        a = re_valid_version.match(a).groupdict()
+        b = re_valid_version.match(b).groupdict()
+
+        res = self.cmp(int(a['epoch'] or "0"), int(b['epoch'] or "0"))
+        if res != 0:
+            return res
+        res = self.version_cmp_part(a['upstream_version'], b['upstream_version'])
+        if res != 0:
+            return res
+        res = self.version_cmp_part(a['debian_revision'] or "0", b['debian_revision'] or "0")
+        return res
 
     def remove_files(self): # I am not sure if this is needed
         """Remove created files
