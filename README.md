@@ -20,6 +20,7 @@ ConPan workflow is very simple:
 - requests>=2.18.2
 - psycopg2-binary>=2.7.4
 - matplotlib>=3.0.0
+- tqdm>=>=4.36.0
 
 **Other:**
 - docker-ce (https://docs.docker.com/install/)
@@ -28,7 +29,7 @@ ConPan workflow is very simple:
 
 ##  How to install/uninstall
 ConPan is developed and tested mainly on GNU/Linux platforms. Thus it is very likely it will work out of the box
-on any Linux-like (or Unix-like) platform, upon providing the right version of Python (3.5, 3.6).
+on any Linux-like (or Unix-like) platform, upon providing the right requirements and version of Python (3.5, 3.6).
 
 
 **To install**, run:
@@ -52,13 +53,13 @@ You will need permission to use the Docker tool first.
 Launching ConPan from command line does not require much effort.
 
 ```
-$ conpan -p <package_type> -c <image> -d <Path-to/data>
+$ conpan -p <package_type> -c <image> 
 ```
 
 **Example:**
 
 ```
-$ conpan -p debian -c 127labs/blog -d ~/ConPan/data/debian
+$ conpan -p debian -c 127labs/blog -d 
 ```
 
 **Output:**
@@ -90,15 +91,19 @@ from conpan.conpan import ConPan
 # With 2 parameters
 image_community = '127labs/blog'
 image_official = 'debian:buster-slim'
-dir_data = 'Path-to/data/'
 
-cp = ConPan(packages="debian", image=image_official, dir_data=dir_data)
+cp = ConPan(packages="debian", image=image_official)
 
 # extracting all information
 general_info, installed_packages, tracked_packages, vulnerabilities, bugs = cp.analyze()
-
+```
 OR
-# Extracting specific information
+```
+# Extracting some specific information
 
-
+cp.general_info()
+cp.installed_packages()
+cp.tracked_packages()
+cp.vulnerabilities()
+cp.bugs()
 ```
