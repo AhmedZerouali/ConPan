@@ -33,8 +33,11 @@ on any Linux-like (or Unix-like) platform, upon providing the right requirements
 **To install**, run:
 ```
 $> git clone https://github.com/neglectos/ConPan
-$> python3 setup.py build
 $> python3 setup.py install
+```
+Or simply:
+```
+$> pip3 install git+https://github.com/neglectos/ConPan
 ```
 
 **To uninstall**, run:
