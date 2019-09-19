@@ -195,8 +195,6 @@ class Debian:
         :param installed_packages: packages found installed in the Container
         :return tracked_packages: packages found installed in the Container and coming from Debian.
         """
-
-
         debian_p = self.read_csv_url(PACKAGES)
 
         tracked_packages = (installed_packages.
@@ -277,15 +275,10 @@ class Debian:
         :param tracked_packages: packages found installed in the container
         :return
         """
-
         vulnerabilities = self.json_from_url(VULS_JSON)
-
         dict_date, dict_release = self.dates_release_debian()
-
         sorted_ip = self.unique_installed_packages(tracked_packages)
-
-        fcsv = open(self.data_dir + VULS_CSV, 'w')
-        fcsv.write('source;source_version;urgency;status;fixed_in;debianbug;cve\n')
+        tcsv = []
 
         for index, raw in enumerate(sorted_ip.iterrows()):  # we iterate over the sources (docker)
             source = raw[1]['source']
@@ -310,29 +303,34 @@ class Debian:
 
                     if status == "open" or status == "undetermined":  # if the vulnerability is still OPEN
                         fixed = "undefined"
-                        fcsv.write(';'.join([source, source_version, urgency, status, fixed, debianbug, cve]) + '\n')
                     else:  # if the vulnerability is RESOLVED
                         try:
                             fixed = v['releases'][release]["fixed_version"]
                         except:
                             continue
-                        if apt_pkg.version_compare(source_version,
-                                                   fixed) < 0:  # Compare between the used source and fixed one (dates comparison)
-                            fcsv.write(';'.join([source, source_version, urgency, status, fixed, debianbug, cve]) + '\n')
+                        if apt_pkg.version_compare(source_version,fixed) >= 0:  # Compare between the used source and fixed one (dates comparison)
+                            continue
+                    tcsv.append([source, source_version,urgency,status,fixed,debianbug,cve])
 
                 except:
                     pass
-        fcsv.close()
+
+        tcsv = list(zip(*tcsv))
+        columns = ['source', 'source_version','urgency','status','fixed','debianbug','cve']
+        df = pd.DataFrame(columns=columns)
+        for index, col in enumerate(columns):
+            df[col] = tcsv[index]
+
+        return df
+
+
 
     def get_vuls(self, tracked_packages):
         """Extracts and Merges vulnerabilities with tracked packages.
         :param tracked_packages: packages found installed in the container
         :return docker_vuls: knows vulnerabilities of the installed packages
         """
-        self.final_vuls(tracked_packages)
-
-        vuls = self.read_csv(VULS_CSV)  # GET VULNERABILITIES
-
+        vuls = self.final_vuls(tracked_packages)
         docker_vuls = (tracked_packages
                        .set_index(['source', 'source_version'])[['missing_updates']]
                        .merge(vuls
