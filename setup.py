@@ -51,7 +51,8 @@ setup(
             'pandas>=0.22.0',
             'requests>=2.18.2',
             'psycopg2-binary>=2.7.4',
-            'matplotlib>=3.0.0'
+            'matplotlib>=3.0.0',
+            'tqdm>=4.36.0'
         ],
         scripts=[
             'bin/conpan'

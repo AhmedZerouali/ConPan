@@ -26,6 +26,7 @@ import warnings
 import apt_pkg
 import psycopg2
 import io
+from tqdm import tqdm
 import requests
 apt_pkg.init_system()
 import logging
@@ -280,7 +281,7 @@ class Debian:
         sorted_ip = self.unique_installed_packages(tracked_packages)
         tcsv = []
 
-        for index, raw in enumerate(sorted_ip.iterrows()):  # we iterate over the sources (docker)
+        for index, raw in tqdm(enumerate(sorted_ip.iterrows())):  # we iterate over the sources (docker)
             source = raw[1]['source']
             source_version = raw[1]['source_version']
             release = dict_release['first_seen'][(source, source_version)]
@@ -359,43 +360,47 @@ class Debian:
         It extracts bugs for all versions and save them in a file.
         :param tracked_packages: packages found installed in the container
         """
-
         cursor = self.connexion_udd()
-
-        unique_packages = tracked_packages.groupby('source').count().loc[:, []].reset_index()
-
-        f = open(self.data_dir + BUGS_CSV, 'w')
-        f.write('source;debianbug;found_in;fixed_in;type;status;severity;arrival;last_modified\n')
-
-        for index, raw in enumerate(unique_packages.iterrows()):
-            source = raw[1]['source']
-
+        sources = tracked_packages.source.drop_duplicates().values
+        normal = []
+        archive = []
+        for source in tqdm(sources):
             cursor.execute(
-                "SELECT DISTINCT bugs.id, bugs.status, bugs.severity, " +
+                "SELECT DISTINCT bugs.source, bugs.id, bugs.status, bugs.severity, " +
                 "bugs.arrival, bugs.last_modified, bugs_found_in.version, bugs_fixed_in.version " +
                 "FROM bugs_found_in, bugs LEFT JOIN bugs_fixed_in " +
                 "ON bugs.id=bugs_fixed_in.id " +
                 "WHERE bugs.id=bugs_found_in.id " +
                 "AND bugs.source='" + source + "' ")
-            data = cursor.fetchall()
-            for x in data:
-                id, status, severity, arrival, last_modified, found_in, fixed_in = x
-                f.write(';'.join([source, str(id), found_in, str(fixed_in), 'normal', status, severity, str(arrival), str(last_modified)]) + '\n')
+            n = cursor.fetchall()
 
             cursor.execute(
-                "SELECT DISTINCT archived_bugs.id, archived_bugs.status, archived_bugs.severity, " +
+                "SELECT DISTINCT archived_bugs.source, archived_bugs.id, archived_bugs.status, archived_bugs.severity, " +
                 "archived_bugs.arrival, archived_bugs.last_modified, " +
                 "archived_bugs_found_in.version, archived_bugs_fixed_in.version " +
                 "FROM archived_bugs_found_in, archived_bugs LEFT JOIN archived_bugs_fixed_in " +
                 "ON archived_bugs.id=archived_bugs_fixed_in.id " +
                 "WHERE archived_bugs.id=archived_bugs_found_in.id " +
                 "AND archived_bugs.source='" + source + "'")
-            data2 = cursor.fetchall()
-            for x in data2:
-                id, status, severity, arrival, last_modified, found_in, fixed_in = x
-                f.write(';'.join([source, str(id), found_in, str(fixed_in), 'archived', status, severity, str(arrival), str(last_modified)]) + '\n')
+            a = cursor.fetchall()
 
-        f.close()
+            normal = normal + n
+            archive = archive + a
+        normal = list(zip(*normal))
+        archive = list(zip(*archive))
+
+        columns = ['source', 'debianbug', 'status', 'severity', 'arrival', 'last_modified', 'found_in', 'fixed_in']
+        df_normal = pd.DataFrame(columns=columns)
+        df_archive = pd.DataFrame(columns=columns)
+
+        for index, col in enumerate(columns):
+            df_normal[col] = normal[index]
+            df_archive[col] = archive[index]
+
+        df_normal['type'] = 'normal'
+        df_archive['type'] = 'archive'
+        data = pd.concat([df_normal, df_archive])
+        return data
 
     def get_bugs(self,tracked_packages):
         """Track bugs of the installed package versions: version where bug found <= version used < version where the bug was fixed
@@ -404,11 +409,12 @@ class Debian:
         :return bugs: knows bugs of the installed packages
         """
 
-        self.extract_bugs_from_udd(tracked_packages)
-        bugs = self.read_csv(BUGS_CSV)
+        bugs = self.extract_bugs_from_udd(tracked_packages)
 
         bugs['fixed_in'] = bugs['fixed_in'].apply(lambda x: str(x).split('/')[-1])
         bugs['found_in'] = bugs['found_in'].apply(lambda x: str(x).split('/')[-1])
+        bugs['last_modified'] = bugs['last_modified'].apply(lambda x: str(x).split()[0])
+        bugs['arrival'] = bugs['arrival'].apply(lambda x: str(x).split()[0])
 
         bugs['source'] = bugs['source'].apply(str)
 
@@ -424,22 +430,22 @@ class Debian:
                 .reset_index()
                 )
 
-        bugs['filtre'] = bugs.apply(
+        mask = bugs.apply(
             lambda row: True if apt_pkg.version_compare(str(row['found_in']), str(row['source_version'])) <= 0
+            and apt_pkg.version_compare(str(row['source_version']), str(row['fixed_in'])) < 0
             else False, axis=1)
+        # Filtre on bugs that were created before the creation of the package and fixed after that (or not)
+        bugs = bugs[mask]
 
-        bugs['filtre2'] = bugs.apply(
-            lambda row: True if apt_pkg.version_compare(str(row['source_version']), str(row['fixed_in'])) < 0
+        bugs_pending = bugs.query('status != "done"')
+        bugs_done = bugs.query('status == "done"')
+        mask = bugs_done.apply(
+            lambda d:  True if d['last_modified'].replace('-', '') > d['package_date']
             else False, axis=1)
+        bugs_done = bugs_done[mask] # some done bugs do not have the fixed_in packages, we compare by date
+        bugs = pd.concat([bugs_done, bugs_pending])
 
-        bugs['filtre3'] = bugs.apply(
-            lambda d: True if d['last_modified'].replace('-', '') < d['package_date'] and d['status'] == 'done'
-            else False, axis=1)
-
-        bugs = bugs.query('filtre==True and filtre2==True and filtre3!=True')
-
-        bugs.drop(['filtre', 'filtre2', 'filtre3', 'package_date'], axis=1, inplace=True)
-
+        bugs.drop(['package_date'], axis=1, inplace=True)
         bugs = bugs.groupby(['debianbug', 'source']).first().reset_index()
 
         return bugs
