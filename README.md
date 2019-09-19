@@ -24,8 +24,6 @@ ConPan workflow is very simple:
 
 **Other:**
 - docker-ce (https://docs.docker.com/install/)
-- apt_pkg (```sudo apt-get install python3-apt```)
-
 
 ##  How to install/uninstall
 ConPan is developed and tested mainly on GNU/Linux platforms. Thus it is very likely it will work out of the box
