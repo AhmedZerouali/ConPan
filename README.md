@@ -109,7 +109,7 @@ cp.vulnerabilities()
 cp.bugs()
 ```
 
-You can cite the associated research article using:
+You can cite the associated research paper using:
 ```
 @inproceedings{zerouali2019conpan,
   title={ConPan: a tool to analyze packages in software containers},
