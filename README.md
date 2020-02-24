@@ -108,3 +108,16 @@ cp.tracked_packages()
 cp.vulnerabilities()
 cp.bugs()
 ```
+
+You can cite the associated research article using:
+```
+@inproceedings{zerouali2019conpan,
+  title={ConPan: a tool to analyze packages in software containers},
+  author={Zerouali, Ahmed and Cosentino, Valerio and Robles, Gregorio and Gonzalez-Barahona, Jesus M and Mens, Tom},
+  booktitle={2019 IEEE/ACM 16th International Conference on Mining Software Repositories (MSR)},
+  pages={592--596},
+  year={2019},
+  organization={IEEE}
+}
+```
+
