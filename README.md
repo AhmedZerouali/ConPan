@@ -98,7 +98,7 @@ cp = ConPan(packages="debian", image=image_official)
 # extracting all information
 general_info, installed_packages, tracked_packages, vulnerabilities, bugs = cp.analyze()
 ```
-OR
+Or
 ```
 # Extracting some specific information
 
@@ -108,6 +108,7 @@ cp.tracked_packages()
 cp.vulnerabilities()
 cp.bugs()
 ```
+A scientific publication reporting on the ConPan tool can be found here: https://doi.org/10.1109/MSR.2019.00089
 
 You can cite the associated research paper using:
 ```
@@ -120,4 +121,9 @@ You can cite the associated research paper using:
   organization={IEEE}
 }
 ```
+Or
+```
+A. Zerouali, V. Cosentino, G. Robles, J. M. Gonzalez-Barahona and T. Mens, "ConPan: A Tool to Analyze Packages in Software Containers", 2019 IEEE/ACM 16th International Conference on Mining Software Repositories (MSR), 2019, pp. 592-596, doi: 10.1109/MSR.2019.00089
+```
+
 
